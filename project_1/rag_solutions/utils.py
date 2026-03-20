@@ -43,6 +43,7 @@ def handle_question(rag, question: str):
 pip install rank-bm25       # for hybrid search
 streamlit run rag_solutions/home.py   # hub
 streamlit run rag_solutions/1_healthcare.py  # individual
+install -r rag_solutions/requirements.txt
 
 
 

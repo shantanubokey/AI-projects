@@ -1,0 +1,7 @@
+sentence-transformers
+faiss-cpu
+groq
+numpy
+pandas
+matplotlib
+rank-bm25

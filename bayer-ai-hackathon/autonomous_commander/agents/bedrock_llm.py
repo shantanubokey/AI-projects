@@ -10,7 +10,7 @@ import warnings
 from langchain_aws import ChatBedrock
 
 
-DEFAULT_MODEL_ID = "meta.llama3-3-70b-instruct-v1:0"
+DEFAULT_MODEL_ID = "qwen.qwen3-coder-next"
 
 
 def _resolve_model_id() -> str:

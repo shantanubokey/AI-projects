@@ -1,0 +1,12 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow", "Action": ["bedrock:InvokeModel"], "Resource": "*" },
+    { "Effect": "Allow", "Action": ["logs:StartQuery", "logs:GetQueryResults", "logs:DescribeLogGroups", "logs:FilterLogEvents"], "Resource": "*" },
+    { "Effect": "Allow", "Action": ["cloudwatch:GetMetricData", "cloudwatch:DescribeAlarms"], "Resource": "*" },
+    { "Effect": "Allow", "Action": ["codedeploy:ListDeployments", "codedeploy:GetDeployment"], "Resource": "*" },
+    { "Effect": "Allow", "Action": ["ecs:DescribeTaskDefinition", "ecs:ListTaskDefinitions", "ecs:RunTask"], "Resource": "*" },
+    { "Effect": "Allow", "Action": ["ssm:GetParameter", "ssm:GetParameterHistory", "ssm:GetParameters"], "Resource": "*" },
+    { "Effect": "Allow", "Action": ["xray:GetTraceSummaries", "xray:BatchGetTraces"], "Resource": "*" }
+  ]
+}

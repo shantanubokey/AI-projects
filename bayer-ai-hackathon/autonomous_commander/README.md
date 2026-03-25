@@ -303,9 +303,41 @@ python main.py
 - IAM role with permissions: `bedrock:InvokeModel`, `logs:*`, `cloudwatch:GetMetricData`, `codedeploy:List*`, `ecs:RunTask`, `ssm:GetParameter`
 - Bedrock inference profile created for your target model (set in `BEDROCK_MODEL_ID`)
 
+### Step 0 — Bootstrap Network + IAM (New VPC)
+
+```bash
+export AWS_REGION=us-east-1
+export ACCOUNT_ID=639177726380
+export BEDROCK_MODEL_ID="your-inference-profile-id-or-arn"
+
+# Make scripts executable
+chmod +x deployment/aws/*.sh
+
+# Create VPC, subnets, and security groups (public Streamlit)
+bash deployment/aws/bootstrap_network.sh
+
+# Create IAM roles + policies
+bash deployment/aws/create_roles.sh
+
+# Store Bedrock model ID in SSM for both CLI and Streamlit
+aws ssm put-parameter \
+  --name /autonomous-commander/bedrock-model-id \
+  --type String \
+  --value "$BEDROCK_MODEL_ID" \
+  --overwrite \
+  --region us-east-1
+```
+
 ### Step 1 — Build & Push Docker Image
 
 ```bash
+# Optional helper script (uses BEDROCK_MODEL_ID, defaults to qwen.qwen3-coder-next)
+export ACCOUNT_ID=639177726380
+export BEDROCK_MODEL_ID="qwen.qwen3-coder-next"
+chmod +x deployment/aws/deploy_images.sh
+bash deployment/aws/deploy_images.sh
+
+# Manual steps
 # Authenticate to ECR
 aws ecr get-login-password --region us-east-1 | \
   docker login --username AWS --password-stdin ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com
@@ -313,10 +345,12 @@ aws ecr get-login-password --region us-east-1 | \
 # Create ECR repo
 aws ecr create-repository --repository-name autonomous-commander --region us-east-1
 
-# Build and push
+# Build and push (same image, two tags)
 docker build -f deployment/Dockerfile -t autonomous-commander .
-docker tag autonomous-commander:latest ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/autonomous-commander:latest
-docker push ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/autonomous-commander:latest
+docker tag autonomous-commander:latest ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/autonomous-commander:cli
+docker tag autonomous-commander:latest ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/autonomous-commander:streamlit
+docker push ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/autonomous-commander:cli
+docker push ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/autonomous-commander:streamlit
 ```
 
 ### Step 2 — Register ECS Task Definition
@@ -329,7 +363,14 @@ aws ecs register-task-definition \
 
 # Make sure the SSM parameter `/autonomous-commander/bedrock-model-id`
 # contains your Bedrock inference profile ID or ARN.
+
+# Register the Streamlit task definition
+aws ecs register-task-definition \
+  --cli-input-json file://deployment/aws/ecs_task_definition_streamlit.json \
+  --region us-east-1
 ```
+
+Note: Task definitions are set to `ARM64` to match Apple Silicon builds. If you build `linux/amd64`, remove the `runtimePlatform` block.
 
 ### Step 3 — Create ECS Cluster & Service
 
@@ -339,9 +380,30 @@ aws ecs create-cluster --cluster-name autonomous-commander --region us-east-1
 
 # Create CloudWatch log group
 aws logs create-log-group --log-group-name /ecs/autonomous-commander --region us-east-1
+aws logs create-log-group --log-group-name /ecs/autonomous-commander-streamlit --region us-east-1
 ```
 
-### Step 4 — Deploy Lambda Trigger
+### Step 4 — Create Public Streamlit Service (Fargate)
+
+```bash
+# Replace SUBNET_IDS and SECURITY_GROUP_STREAMLIT from bootstrap output
+aws ecs create-service \
+  --cluster autonomous-commander \
+  --service-name autonomous-commander-streamlit \
+  --task-definition autonomous-commander-streamlit \
+  --desired-count 1 \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={subnets=[SUBNET_IDS],securityGroups=[SECURITY_GROUP_STREAMLIT],assignPublicIp=ENABLED}" \
+  --region us-east-1
+
+# Find the public IP
+aws ecs list-tasks --cluster autonomous-commander --service-name autonomous-commander-streamlit --region us-east-1
+aws ecs describe-tasks --cluster autonomous-commander --tasks <TASK_ARN> --region us-east-1
+```
+
+The Streamlit UI will be available at `http://<PUBLIC_IP>:8501` (public IP is returned in the task ENI).
+
+### Step 5 — Deploy Lambda Trigger (CLI workflow)
 
 ```bash
 # Zip and deploy the Lambda trigger
@@ -350,7 +412,7 @@ zip lambda_trigger.zip deployment/aws/lambda_trigger.py
 aws lambda create-function \
   --function-name autonomous-commander-trigger \
   --runtime python3.11 \
-  --role arn:aws:iam::ACCOUNT_ID:role/lambdaExecutionRole \
+  --role arn:aws:iam::ACCOUNT_ID:role/autonomous-commander-lambda-role \
   --handler lambda_trigger.handler \
   --zip-file fileb://lambda_trigger.zip \
   --environment Variables="{
@@ -407,6 +469,8 @@ In the AWS Console or via CLI, set your existing CloudWatch Alarms to send notif
   ]
 }
 ```
+
+The same policy is stored at `deployment/aws/policies/autonomous_commander_task_policy.json`.
 
 ---
 

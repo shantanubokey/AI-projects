@@ -1,5 +1,5 @@
 {
-  "family": "autonomous-commander",
+  "family": "autonomous-commander-streamlit",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
   "runtimePlatform": {
@@ -12,16 +12,15 @@
   "taskRoleArn": "arn:aws:iam::639177726380:role/autonomousCommanderTaskRole",
   "containerDefinitions": [
     {
-      "name": "autonomous-commander",
-      "image": "639177726380.dkr.ecr.us-east-1.amazonaws.com/autonomous-commander:cli",
+      "name": "autonomous-commander-streamlit",
+      "image": "639177726380.dkr.ecr.us-east-1.amazonaws.com/autonomous-commander:streamlit",
       "essential": true,
       "portMappings": [
-        { "containerPort": 8080, "protocol": "tcp" }
+        { "containerPort": 8501, "protocol": "tcp" }
       ],
       "environment": [
         { "name": "AWS_DEFAULT_REGION", "value": "us-east-1" },
-        { "name": "BEDROCK_REGION", "value": "us-east-1" },
-        { "name": "LOG_LEVEL", "value": "INFO" }
+        { "name": "BEDROCK_REGION", "value": "us-east-1" }
       ],
       "secrets": [
         {
@@ -29,10 +28,21 @@
           "valueFrom": "arn:aws:ssm:us-east-1:639177726380:parameter/autonomous-commander/bedrock-model-id"
         }
       ],
+      "command": [
+        "streamlit",
+        "run",
+        "ui/streamlit_app.py",
+        "--server.port",
+        "8501",
+        "--server.address",
+        "0.0.0.0",
+        "--server.headless",
+        "true"
+      ],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/autonomous-commander",
+          "awslogs-group": "/ecs/autonomous-commander-streamlit",
           "awslogs-region": "us-east-1",
           "awslogs-stream-prefix": "ecs"
         }

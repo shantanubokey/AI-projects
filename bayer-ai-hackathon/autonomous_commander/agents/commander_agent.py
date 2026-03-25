@@ -8,8 +8,7 @@ from typing import TypedDict, Annotated, List
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from langchain_aws import ChatBedrock
-import boto3
+from agents.bedrock_llm import get_bedrock_llm
 
 
 # ── State ──────────────────────────────────────────────────────────────────────
@@ -28,11 +27,7 @@ class InvestigationState(TypedDict):
 # ── LLM setup (Bedrock Claude) ─────────────────────────────────────────────────
 
 def get_llm():
-    return ChatBedrock(
-        model_id="anthropic.claude-3-5-sonnet-20241022-v2:0",
-        region_name="us-east-1",
-        model_kwargs={"max_tokens": 4096, "temperature": 0.1},
-    )
+    return get_bedrock_llm(max_tokens=4096, temperature=0.1)
 
 
 # ── Commander Node ─────────────────────────────────────────────────────────────

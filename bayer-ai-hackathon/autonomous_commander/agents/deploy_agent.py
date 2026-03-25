@@ -5,7 +5,7 @@ Maps real-time errors against CI/CD deployment timeline and service configuratio
 
 import json
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_aws import ChatBedrock
+from agents.bedrock_llm import get_bedrock_llm
 from agents.commander_agent import InvestigationState
 
 
@@ -31,11 +31,7 @@ Return findings as JSON:
 
 
 def get_llm():
-    return ChatBedrock(
-        model_id="anthropic.claude-3-5-sonnet-20241022-v2:0",
-        region_name="us-east-1",
-        model_kwargs={"max_tokens": 2048, "temperature": 0.1},
-    )
+    return get_bedrock_llm(max_tokens=2048, temperature=0.1)
 
 
 def fetch_deployment_history(alert: dict) -> dict:
@@ -108,7 +104,6 @@ Analyze deployment timeline correlation with the incident and return structured 
         findings = {"raw_analysis": response.content}
 
     return {
-        **state,
-        "messages": state["messages"] + [response],
+        "messages": [response],
         "deploy_findings": findings,
     }

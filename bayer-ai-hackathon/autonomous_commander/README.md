@@ -118,6 +118,10 @@ pip install -r requirements.txt
 # Configure AWS credentials (needs Bedrock access)
 aws configure
 
+# Set Bedrock model/inference profile (required for some models)
+# Use your Bedrock inference profile ID or ARN
+export BEDROCK_MODEL_ID="your-inference-profile-id-or-arn"
+
 # Run the investigation
 python main.py
 ```
@@ -129,6 +133,7 @@ python main.py
 ### Prerequisites
 - AWS account with Bedrock enabled in `us-east-1`
 - IAM role with permissions: `bedrock:InvokeModel`, `logs:*`, `cloudwatch:GetMetricData`, `codedeploy:List*`, `ecs:RunTask`, `ssm:GetParameter`
+ - Bedrock inference profile created for your target model (set in `BEDROCK_MODEL_ID`)
 
 ### Step 1 — Build & Push Docker Image
 
@@ -153,6 +158,9 @@ docker push ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/autonomous-commander:late
 aws ecs register-task-definition \
   --cli-input-json file://deployment/aws/ecs_task_definition.json \
   --region us-east-1
+
+# Make sure the SSM parameter `/autonomous-commander/bedrock-model-id`
+# contains your Bedrock inference profile ID or ARN.
 ```
 
 ### Step 3 — Create ECS Cluster & Service

@@ -42,7 +42,12 @@ def build_graph() -> StateGraph:
     return graph.compile()
 
 
-def run_investigation(alert: dict) -> dict:
+def run_investigation(
+    alert: dict,
+    logs_override: dict | None = None,
+    precomputed_plan: list[str] | None = None,
+    precomputed_agents: list[str] | None = None,
+) -> dict:
     """
     Entry point to run a full autonomous investigation.
 
@@ -57,13 +62,18 @@ def run_investigation(alert: dict) -> dict:
     initial_state: InvestigationState = {
         "messages": [],
         "alert": alert,
-        "investigation_plan": [],
+        "investigation_plan": precomputed_plan or [],
+        "agents_to_invoke": precomputed_agents or ["logs_agent", "metrics_agent", "deploy_agent"],
         "logs_findings": {},
         "metrics_findings": {},
         "deploy_findings": {},
         "final_report": "",
         "current_step": "start",
     }
+    if logs_override:
+        initial_state["logs_override"] = logs_override
+    if precomputed_plan or precomputed_agents:
+        initial_state["commander_precomputed"] = True
 
     final_state = app.invoke(initial_state)
     return final_state

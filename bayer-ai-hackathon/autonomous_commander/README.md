@@ -134,6 +134,31 @@ An autonomous AI system built on **LangGraph** + **AWS Bedrock (Claude)** that i
 ## Demo Mock Data (Used In Local Runs)
 
 These are the exact mocked inputs the agents use today so the demo is deterministic.
+Set `MOCK_VARIANT=alt` to switch to the alternate dataset, or `MOCK_VARIANT=random` to shuffle between them.
+
+### Logs Mock Editor UI
+
+You can edit the Logs Agent mock data from a small local UI:
+
+```bash
+python ui/logs_mock_ui.py
+```
+
+Then open `http://127.0.0.1:5055` in your browser, edit the JSON, and click **Save Mock**.
+The Logs Agent will read from `mock_inputs/logs_mock.json` automatically (or override via `MOCK_LOGS_FILE`).
+
+### Streamlit Demo UI (Logs Input + RCA Output)
+
+Run the UI:
+
+```bash
+streamlit run ui/streamlit_app.py
+```
+
+In the UI you can:
+- Paste log lines
+- Set alert context (error type, severity, etc.)
+- Run the Commander to generate the final RCA artifact
 
 **Logs Agent mock data**  
 File: `agents/logs_agent.py` → `fetch_logs_from_cloudwatch()`

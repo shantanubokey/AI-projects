@@ -4,6 +4,8 @@ Monitors performance: CPU, latency, memory leak patterns.
 """
 
 import json
+import os
+import random
 from langchain_core.messages import HumanMessage, SystemMessage
 from agents.bedrock_llm import get_bedrock_llm
 from agents.commander_agent import InvestigationState
@@ -40,7 +42,7 @@ def fetch_metrics_from_cloudwatch(alert: dict) -> dict:
     Replace with real boto3 CloudWatch get_metric_data call in deployment.
     """
     # Simulated telemetry — swap with boto3 CloudWatch Metrics query
-    return {
+    mock_a = {
         "cpu_utilization": {
             "payment-service": [45, 48, 52, 89, 95, 98, 97, 94],  # spike at index 3
             "order-service": [30, 31, 32, 33, 35, 34, 33, 32],
@@ -58,9 +60,39 @@ def fetch_metrics_from_cloudwatch(alert: dict) -> dict:
         "interval_minutes": 5,
         "service": alert.get("service", "unknown"),
     }
+    mock_b = {
+        "cpu_utilization": {
+            "payment-service": [35, 36, 38, 40, 42, 41, 39, 37],
+            "db-proxy": [25, 28, 33, 45, 60, 72, 68, 55],
+        },
+        "latency_p99_ms": {
+            "payment-service": [140, 160, 180, 600, 1200, 2200, 1800, 900],
+            "api-gateway": [60, 65, 70, 300, 800, 1500, 1200, 650],
+        },
+        "memory_utilization_percent": {
+            "payment-service": [58, 59, 60, 61, 62, 63, 64, 65],
+        },
+        "error_rate_percent": {
+            "payment-service": [0.2, 0.2, 0.3, 1.2, 4.8, 9.6, 7.1, 3.5],
+        },
+        "interval_minutes": 5,
+        "service": alert.get("service", "unknown"),
+    }
+
+    variant = os.getenv("MOCK_VARIANT", "default").lower()
+    if variant == "random":
+        return random.choice([mock_a, mock_b])
+    if variant in ("alt", "b", "scenario_b"):
+        return mock_b
+    return mock_a
 
 
 def metrics_agent_node(state: InvestigationState) -> InvestigationState:
+    if "agents_to_invoke" in state and state["agents_to_invoke"] and "metrics_agent" not in state["agents_to_invoke"]:
+        return {
+            "metrics_findings": {"skipped": True, "reason": "not selected by commander"},
+        }
+
     llm = get_llm()
 
     raw_metrics = fetch_metrics_from_cloudwatch(state["alert"])

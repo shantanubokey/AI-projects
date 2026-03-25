@@ -17,11 +17,14 @@ class InvestigationState(TypedDict):
     messages: Annotated[list, add_messages]
     alert: dict                        # raw incoming alert
     investigation_plan: List[str]      # ordered steps commander decides
+    agents_to_invoke: List[str]        # agents selected by commander
     logs_findings: dict                # output from logs agent
     metrics_findings: dict             # output from metrics agent
     deploy_findings: dict              # output from deploy intelligence agent
     final_report: str                  # consolidated RCA report
     current_step: str                  # tracks which node is active
+    logs_override: dict                # optional override for logs input
+    commander_precomputed: bool        # skip commander LLM if plan already computed
 
 
 # ── LLM setup (Bedrock Claude) ─────────────────────────────────────────────────
@@ -47,9 +50,21 @@ When given an alert, respond with a JSON investigation plan:
   "plan": ["step1", "step2", ...],
   "agents_to_invoke": ["logs_agent", "metrics_agent", "deploy_agent"]
 }
+
+Select agents based on the alert error type. For example:
+- Log or exception errors → prefer logs_agent
+- Latency/throughput/memory errors → prefer metrics_agent
+- Deployment/config changes → prefer deploy_agent
+If unsure, invoke all three.
 """
 
 def commander_node(state: InvestigationState) -> InvestigationState:
+    if state.get("commander_precomputed") and state.get("investigation_plan") and state.get("agents_to_invoke"):
+        return {
+            **state,
+            "current_step": "investigating",
+        }
+
     llm = get_llm()
     alert = state["alert"]
 
@@ -78,6 +93,7 @@ def commander_node(state: InvestigationState) -> InvestigationState:
         **state,
         "messages": state["messages"] + [response],
         "investigation_plan": plan_data.get("plan", []),
+        "agents_to_invoke": plan_data.get("agents_to_invoke", ["logs_agent", "metrics_agent", "deploy_agent"]),
         "current_step": "investigating",
     }
 

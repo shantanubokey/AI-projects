@@ -1,0 +1,10 @@
+{
+  "log_groups": ["/aws/lambda/payment-service", "/aws/ecs/order-service"],
+  "sample_errors": [
+    "ERROR 2026-03-25T10:23:11Z [payment-service] NullPointerException at PaymentProcessor.java:142",
+    "ERROR 2026-03-25T10:23:12Z [order-service] Connection timeout to payment-service after 30000ms",
+    "FATAL 2026-03-25T10:23:15Z [api-gateway] Circuit breaker OPEN for payment-service"
+  ],
+  "trace_ids": ["1-abc123", "1-abc124"],
+  "time_range": "last 30 minutes"
+}

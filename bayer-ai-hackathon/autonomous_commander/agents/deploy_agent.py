@@ -4,6 +4,8 @@ Maps real-time errors against CI/CD deployment timeline and service configuratio
 """
 
 import json
+import os
+import random
 from langchain_core.messages import HumanMessage, SystemMessage
 from agents.bedrock_llm import get_bedrock_llm
 from agents.commander_agent import InvestigationState
@@ -40,7 +42,7 @@ def fetch_deployment_history(alert: dict) -> dict:
     Replace with real boto3 calls in deployment.
     """
     # Simulated deployment history — swap with boto3 CodeDeploy list_deployments
-    return {
+    mock_a = {
         "recent_deployments": [
             {
                 "id": "d-ABC123",
@@ -73,9 +75,54 @@ def fetch_deployment_history(alert: dict) -> dict:
         "incident_start": alert.get("timestamp", "2026-03-25T10:23:00Z"),
         "service": alert.get("service", "unknown"),
     }
+    mock_b = {
+        "recent_deployments": [
+            {
+                "id": "d-GHI789",
+                "service": "payment-service",
+                "version": "v2.4.2",
+                "deployed_at": "2026-03-25T10:05:00Z",  # ~18 min before incident
+                "deployed_by": "ci-pipeline",
+                "changes": ["introduced read-replica routing", "new DB retry policy"],
+                "status": "SUCCEEDED",
+            },
+            {
+                "id": "d-JKL012",
+                "service": "orders-db",
+                "version": "schema-2026-03-25",
+                "deployed_at": "2026-03-25T09:55:00Z",
+                "deployed_by": "db-migrations",
+                "changes": ["added index on orders(user_id)", "updated lock timeout to 5s"],
+                "status": "SUCCEEDED",
+            },
+        ],
+        "config_changes": [
+            {
+                "parameter": "/payment-service/db/pool_size",
+                "old_value": "80",
+                "new_value": "40",
+                "changed_at": "2026-03-25T10:00:00Z",
+                "changed_by": "ops-team",
+            }
+        ],
+        "incident_start": alert.get("timestamp", "2026-03-25T10:23:00Z"),
+        "service": alert.get("service", "unknown"),
+    }
+
+    variant = os.getenv("MOCK_VARIANT", "default").lower()
+    if variant == "random":
+        return random.choice([mock_a, mock_b])
+    if variant in ("alt", "b", "scenario_b"):
+        return mock_b
+    return mock_a
 
 
 def deploy_agent_node(state: InvestigationState) -> InvestigationState:
+    if "agents_to_invoke" in state and state["agents_to_invoke"] and "deploy_agent" not in state["agents_to_invoke"]:
+        return {
+            "deploy_findings": {"skipped": True, "reason": "not selected by commander"},
+        }
+
     llm = get_llm()
 
     deployment_history = fetch_deployment_history(state["alert"])

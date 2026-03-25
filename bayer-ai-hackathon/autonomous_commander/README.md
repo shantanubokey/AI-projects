@@ -6,6 +6,8 @@ An autonomous AI system built on **LangGraph** + **AWS Bedrock (Claude)** that i
 
 ## Architecture
 
+### Production Architecture (Full)
+
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │                     AWS PRODUCTION ENVIRONMENT                       │
@@ -60,6 +62,62 @@ An autonomous AI system built on **LangGraph** + **AWS Bedrock (Claude)** that i
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
+### Local Demo Architecture (LangGraph)
+
+```
+╔══════════════════════════════════════════════════════════════════╗
+║           AUTONOMOUS COMMANDER — INVESTIGATION WORKFLOW          ║
+╚══════════════════════════════════════════════════════════════════╝
+
+                    ┌─────────────────────┐
+                    │   INCOMING ALERT    │
+                    │  (Error / Anomaly)  │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │   COMMANDER AGENT   │
+                    │   (Orchestrator)    │
+                    │                     │
+                    │ • Evaluate alert    │
+                    │ • Classify severity │
+                    │ • Build inv. plan   │
+                    │ • Coordinate agents │
+                    └──────────┬──────────┘
+                               │
+              ┌────────────────┼────────────────┐
+              │                │                │
+              ▼                ▼                ▼
+   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+   │  LOGS AGENT  │  │METRICS AGENT │  │ DEPLOY AGENT │
+   │   Forensic   │  │  Telemetry   │  │  Historian   │
+   │   Expert     │  │  Analyst     │  │              │
+   │              │  │              │  │              │
+   │• Stack traces│  │• CPU spikes  │  │• CI/CD diff  │
+   │• Error corr. │  │• Latency p99 │  │• Config chg  │
+   │• Trace IDs   │  │• Memory leak │  │• Rollback?   │
+   └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
+          │                 │                  │
+          └─────────────────┼──────────────────┘
+                            │
+                            ▼
+                 ┌─────────────────────┐
+                 │   SYNTHESIS NODE    │
+                 │  (Commander RCA)    │
+                 │                     │
+                 │ • Root Cause        │
+                 │ • Contributing Fctrs│
+                 │ • Timeline          │
+                 │ • Remediation Steps │
+                 └──────────┬──────────┘
+                            │
+                            ▼
+                 ┌─────────────────────┐
+                 │    FINAL REPORT     │
+                 │   (RCA Document)    │
+                 └─────────────────────┘
+```
+
 ---
 
 ## Agent Roles
@@ -70,6 +128,91 @@ An autonomous AI system built on **LangGraph** + **AWS Bedrock (Claude)** that i
 | Logs Agent | Forensic Expert — stack traces, error correlations, log anomalies | CloudWatch Logs Insights |
 | Metrics Agent | Telemetry Analyst — CPU, latency p99, memory leaks, error rates | CloudWatch Metrics, X-Ray |
 | Deploy Agent | Historian — CI/CD timeline, config changes, rollback decisions | CodeDeploy, ECS, SSM |
+
+---
+
+## Demo Mock Data (Used In Local Runs)
+
+These are the exact mocked inputs the agents use today so the demo is deterministic.
+
+**Logs Agent mock data**  
+File: `agents/logs_agent.py` → `fetch_logs_from_cloudwatch()`
+
+```json
+{
+  "log_groups": ["/aws/lambda/payment-service", "/aws/ecs/order-service"],
+  "sample_errors": [
+    "ERROR 2026-03-25T10:23:11Z [payment-service] NullPointerException at PaymentProcessor.java:142",
+    "ERROR 2026-03-25T10:23:12Z [order-service] Connection timeout to payment-service after 30000ms",
+    "FATAL 2026-03-25T10:23:15Z [api-gateway] Circuit breaker OPEN for payment-service"
+  ],
+  "trace_ids": ["1-abc123", "1-abc124"],
+  "time_range": "last 30 minutes"
+}
+```
+
+**Metrics Agent mock data**  
+File: `agents/metrics_agent.py` → `fetch_metrics_from_cloudwatch()`
+
+```json
+{
+  "cpu_utilization": {
+    "payment-service": [45, 48, 52, 89, 95, 98, 97, 94],
+    "order-service": [30, 31, 32, 33, 35, 34, 33, 32]
+  },
+  "latency_p99_ms": {
+    "payment-service": [120, 125, 130, 890, 1200, 1450, 1380, 1100],
+    "api-gateway": [50, 52, 55, 600, 950, 1100, 980, 750]
+  },
+  "memory_utilization_percent": {
+    "payment-service": [60, 62, 65, 70, 78, 85, 91, 95]
+  },
+  "error_rate_percent": {
+    "payment-service": [0.1, 0.1, 0.2, 5.4, 18.2, 22.1, 19.8, 15.3]
+  },
+  "interval_minutes": 5,
+  "service": "payment-service"
+}
+```
+
+**Deploy Agent mock data**  
+File: `agents/deploy_agent.py` → `fetch_deployment_history()`
+
+```json
+{
+  "recent_deployments": [
+    {
+      "id": "d-ABC123",
+      "service": "payment-service",
+      "version": "v2.4.1",
+      "deployed_at": "2026-03-25T09:45:00Z",
+      "deployed_by": "ci-pipeline",
+      "changes": ["upgraded stripe-sdk 4.2.0 -> 4.3.0", "increased connection pool size"],
+      "status": "SUCCEEDED"
+    },
+    {
+      "id": "d-DEF456",
+      "service": "order-service",
+      "version": "v1.8.3",
+      "deployed_at": "2026-03-25T08:00:00Z",
+      "deployed_by": "ci-pipeline",
+      "changes": ["bug fix: order status update"],
+      "status": "SUCCEEDED"
+    }
+  ],
+  "config_changes": [
+    {
+      "parameter": "/payment-service/db/max_connections",
+      "old_value": "50",
+      "new_value": "200",
+      "changed_at": "2026-03-25T09:50:00Z",
+      "changed_by": "ops-team"
+    }
+  ],
+  "incident_start": "2026-03-25T10:23:00Z",
+  "service": "payment-service"
+}
+```
 
 ---
 
@@ -133,7 +276,7 @@ python main.py
 ### Prerequisites
 - AWS account with Bedrock enabled in `us-east-1`
 - IAM role with permissions: `bedrock:InvokeModel`, `logs:*`, `cloudwatch:GetMetricData`, `codedeploy:List*`, `ecs:RunTask`, `ssm:GetParameter`
- - Bedrock inference profile created for your target model (set in `BEDROCK_MODEL_ID`)
+- Bedrock inference profile created for your target model (set in `BEDROCK_MODEL_ID`)
 
 ### Step 1 — Build & Push Docker Image
 
